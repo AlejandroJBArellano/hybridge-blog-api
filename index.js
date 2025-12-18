@@ -1,7 +1,11 @@
 // index.js
 const express = require("express");
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const posts = require("./posts");
 const authors = require("./authors");
+const users = require('./users');
+const { passport, JWT_SECRET } = require('./auth');
 
 // Inicializar la aplicación Express
 const app = express();
@@ -10,15 +14,64 @@ const PORT = process.env.PORT || 3000;
 // Middleware para parsear JSON
 app.use(express.json());
 
+// Inicializar Passport
+app.use(passport.initialize());
+
+// Middleware de autenticación
+const authenticate = passport.authenticate('jwt', { session: false });
+
 // Ruta base
 app.get("/", (req, res) => {
   res.json({ message: "Bienvenido a la API de Hybridge Blog Posts" });
 });
 
+// ==================== AUTENTICACIÓN ====================
+
+// POST - Login (generar token JWT)
+app.post('/api/auth/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
+  }
+
+  // Buscar usuario
+  const user = users.find(u => u.username === username);
+
+  if (!user) {
+    return res.status(401).json({ error: 'Credenciales inválidas' });
+  }
+
+  // Verificar contraseña
+  const isValidPassword = await bcrypt.compare(password, user.password);
+
+  if (!isValidPassword) {
+    return res.status(401).json({ error: 'Credenciales inválidas' });
+  }
+
+  // Generar token JWT
+  const token = jwt.sign(
+    { id: user.id, username: user.username, role: user.role },
+    JWT_SECRET,
+    { expiresIn: '24h' }
+  );
+
+  res.json({
+    message: 'Login exitoso',
+    token,
+    user: {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role
+    }
+  });
+});
+
 // ==================== RUTAS DE AUTORES ====================
 
-// POST - Crear un nuevo autor
-app.post("/api/authors", (req, res) => {
+// POST - Crear un nuevo autor (protegido)
+app.post("/api/authors", authenticate, (req, res) => {
   const { name, email, bio } = req.body;
 
   if (!name || !email) {
@@ -54,8 +107,8 @@ app.get("/api/authors/:id", (req, res) => {
   res.json(author);
 });
 
-// PUT - Actualizar un autor
-app.put("/api/authors/:id", (req, res) => {
+// PUT - Actualizar un autor (protegido)
+app.put("/api/authors/:id", authenticate, (req, res) => {
   const id = parseInt(req.params.id);
   const { name, email, bio } = req.body;
 
@@ -73,8 +126,8 @@ app.put("/api/authors/:id", (req, res) => {
   res.json(authors[authorIndex]);
 });
 
-// DELETE - Eliminar un autor
-app.delete("/api/authors/:id", (req, res) => {
+// DELETE - Eliminar un autor (protegido)
+app.delete("/api/authors/:id", authenticate, (req, res) => {
   const id = parseInt(req.params.id);
   const authorIndex = authors.findIndex((a) => a.id === id);
 
@@ -105,8 +158,8 @@ app.get("/api/posts/:id", (req, res) => {
   res.json(post);
 });
 
-// POST - Crear un nuevo post
-app.post("/api/posts", (req, res) => {
+// POST - Crear un nuevo post (protegido)
+app.post("/api/posts", authenticate, (req, res) => {
   const { title, content, author } = req.body;
 
   if (!title || !content || !author) {
@@ -125,8 +178,8 @@ app.post("/api/posts", (req, res) => {
   res.status(201).json(newPost);
 });
 
-// PUT - Actualizar un post
-app.put("/api/posts/:id", (req, res) => {
+// PUT - Actualizar un post (protegido)
+app.put("/api/posts/:id", authenticate, (req, res) => {
   const id = parseInt(req.params.id);
   const { title, content, author } = req.body;
 
@@ -144,8 +197,8 @@ app.put("/api/posts/:id", (req, res) => {
   res.json(posts[postIndex]);
 });
 
-// DELETE - Eliminar un post
-app.delete("/api/posts/:id", (req, res) => {
+// DELETE - Eliminar un post (protegido)
+app.delete("/api/posts/:id", authenticate, (req, res) => {
   const id = parseInt(req.params.id);
 
   const postIndex = posts.findIndex((post) => post.id === id);
