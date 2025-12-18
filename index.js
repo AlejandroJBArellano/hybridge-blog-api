@@ -1,11 +1,11 @@
 // index.js
 const express = require("express");
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 const posts = require("./posts");
 const authors = require("./authors");
-const users = require('./users');
-const { passport, JWT_SECRET } = require('./auth');
+const users = require("./users");
+const { passport, JWT_SECRET } = require("./auth");
 
 // Inicializar la aplicación Express
 const app = express();
@@ -18,7 +18,7 @@ app.use(express.json());
 app.use(passport.initialize());
 
 // Middleware de autenticación
-const authenticate = passport.authenticate('jwt', { session: false });
+const authenticate = passport.authenticate("jwt", { session: false });
 
 // Ruta base
 app.get("/", (req, res) => {
@@ -28,43 +28,45 @@ app.get("/", (req, res) => {
 // ==================== AUTENTICACIÓN ====================
 
 // POST - Login (generar token JWT)
-app.post('/api/auth/login', async (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    return res.status(400).json({ error: 'Usuario y contraseña son requeridos' });
+    return res
+      .status(400)
+      .json({ error: "Usuario y contraseña son requeridos" });
   }
 
   // Buscar usuario
-  const user = users.find(u => u.username === username);
+  const user = users.find((u) => u.username === username);
 
   if (!user) {
-    return res.status(401).json({ error: 'Credenciales inválidas' });
+    return res.status(401).json({ error: "Credenciales inválidas" });
   }
 
   // Verificar contraseña
   const isValidPassword = await bcrypt.compare(password, user.password);
 
   if (!isValidPassword) {
-    return res.status(401).json({ error: 'Credenciales inválidas' });
+    return res.status(401).json({ error: "Credenciales inválidas" });
   }
 
   // Generar token JWT
   const token = jwt.sign(
     { id: user.id, username: user.username, role: user.role },
     JWT_SECRET,
-    { expiresIn: '24h' }
+    { expiresIn: "24h" }
   );
 
   res.json({
-    message: 'Login exitoso',
+    message: "Login exitoso",
     token,
     user: {
       id: user.id,
       username: user.username,
       email: user.email,
-      role: user.role
-    }
+      role: user.role,
+    },
   });
 });
 
